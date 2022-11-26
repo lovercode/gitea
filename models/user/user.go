@@ -7,6 +7,7 @@ package user
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -53,6 +54,7 @@ const (
 	algoScrypt = "scrypt"
 	algoArgon2 = "argon2"
 	algoPbkdf2 = "pbkdf2"
+	algoMd5    = "md5"
 )
 
 // AvailableHashAlgorithms represents the available password hashing algorithms
@@ -366,7 +368,7 @@ func (u *User) NewGitSig() *git.Signature {
 	}
 }
 
-func hashPassword(passwd, salt, algo string) (string, error) {
+func hashPassword(email, passwd, salt, algo string) (string, error) {
 	var tempPasswd []byte
 	var saltBytes []byte
 
@@ -393,6 +395,8 @@ func hashPassword(passwd, salt, algo string) (string, error) {
 		tempPasswd, _ = scrypt.Key([]byte(passwd), saltBytes, 65536, 16, 2, 50)
 	case algoArgon2:
 		tempPasswd = argon2.IDKey([]byte(passwd), saltBytes, 2, 65536, 8, 50)
+	case algoMd5:
+		tempPasswd = bussMd5(passwd, "."+email, 2)
 	case algoPbkdf2:
 		fallthrough
 	default:
@@ -400,6 +404,24 @@ func hashPassword(passwd, salt, algo string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", tempPasswd), nil
+}
+
+func bussMd5(str string, salt string, iteration int) []byte {
+	b := []byte(str)
+	s := []byte(salt)
+	h := md5.New()
+	h.Write(s)
+	h.Write(b)
+	var res []byte
+	res = h.Sum(nil)
+	for i := 0; i < iteration-1; i++ {
+		h.Reset()
+		h.Write(res)
+		res = h.Sum(nil)
+	}
+	dst := make([]byte, hex.EncodedLen(len(res)))
+	hex.Encode(dst, res)
+	return dst
 }
 
 // SetPassword hashes a password using the algorithm defined in the config value of PASSWORD_HASH_ALGO
@@ -415,7 +437,7 @@ func (u *User) SetPassword(passwd string) (err error) {
 	if u.Salt, err = GetUserSalt(); err != nil {
 		return err
 	}
-	if u.Passwd, err = hashPassword(passwd, u.Salt, setting.PasswordHashAlgo); err != nil {
+	if u.Passwd, err = hashPassword(u.Email, passwd, u.Salt, setting.PasswordHashAlgo); err != nil {
 		return err
 	}
 	u.PasswdHashAlgo = setting.PasswordHashAlgo
@@ -425,7 +447,7 @@ func (u *User) SetPassword(passwd string) (err error) {
 
 // ValidatePassword checks if given password matches the one belongs to the user.
 func (u *User) ValidatePassword(passwd string) bool {
-	tempHash, err := hashPassword(passwd, u.Salt, u.PasswdHashAlgo)
+	tempHash, err := hashPassword(u.Email, passwd, u.Salt, u.PasswdHashAlgo)
 	if err != nil {
 		return false
 	}
