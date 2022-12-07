@@ -419,9 +419,7 @@ func bussMd5(str string, salt string, iteration int) []byte {
 		h.Write(res)
 		res = h.Sum(nil)
 	}
-	dst := make([]byte, hex.EncodedLen(len(res)))
-	hex.Encode(dst, res)
-	return dst
+	return res
 }
 
 // SetPassword hashes a password using the algorithm defined in the config value of PASSWORD_HASH_ALGO
