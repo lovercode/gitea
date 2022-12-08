@@ -7,6 +7,7 @@ package db
 import (
 	"code.gitea.io/gitea/models/db"
 	user_model "code.gitea.io/gitea/models/user"
+	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/setting"
 )
 
@@ -17,6 +18,7 @@ func Authenticate(user *user_model.User, login, password string) (*user_model.Us
 	}
 
 	if !user.IsPasswordSet() || !user.ValidatePassword(password) {
+		log.Error("Authenticate err: %+v", user)
 		return nil, user_model.ErrUserNotExist{UID: user.ID, Name: user.Name}
 	}
 
