@@ -447,7 +447,7 @@ func (u *User) SetPassword(passwd string) (err error) {
 func (u *User) ValidatePassword(passwd string) bool {
 	tempHash, err := hashPassword(u.Email, passwd, u.Salt, u.PasswdHashAlgo)
 	if err != nil {
-		log.Error("ValidatePassword.hashPassword err: %v", err)
+		log.Error("ValidatePassword.hashPassword err: %v; user: %v", err, *u)
 		return false
 	}
 
